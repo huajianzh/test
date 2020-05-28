@@ -297,34 +297,54 @@ public class FileUtils {
     }
 
     /**
-     * 复制文件
+     * 复制文件(nio)
      *
      * @param oldPath
      * @param newPath
      * @return boolean
      */
-    private static void copyFile(String oldPath, String newPath) {
-        BufferedInputStream in = null;
-        BufferedOutputStream out = null;
+    private static boolean copyFile(String oldPath, String newPath) {
+       FileChannel in = null;
+        FileChannel out = null;
+        FileInputStream fIn = null;
+        FileOutputStream fOut = null;
         try {
-            File oldfile = new File(oldPath);
-            if (oldfile.exists()) {
-                in = new BufferedInputStream(new FileInputStream(oldfile));
-                out = new BufferedOutputStream(new FileOutputStream(newPath));
-                int byteread = 0;
-                byte[] buffer = new byte[1024];
-                while ((byteread = in.read(buffer)) != -1) {
-                    out.write(buffer, 0, byteread);
+            File oldFile = new File(oldPath);
+            if (oldFile.exists()) {
+                fIn = new FileInputStream(oldFile);
+                in = fIn.getChannel();
+                fOut = new FileOutputStream(newPath);
+                out = fOut.getChannel();
+                ByteBuffer buf = ByteBuffer.allocate(4194304); //4M
+                buf.clear();
+                long len = oldFile.length();
+                int bytesRead;
+                long count = 0;
+                while ((bytesRead = in.read(buf)) != -1) {
+                    buf.flip();
+                    while (buf.hasRemaining()) {
+                        out.write(buf);
+                    }
+                    out.force(true);
+                    buf.clear();
+                    count += bytesRead;
+                    //if (null != listener) {
+                    //    if (listener.isCancel()) {
+                    //        break;
+                    //    }
+                    //    listener.onProgress(count, len);
+                    //}
                 }
-                out.flush();
-            }
+               }
+            return true;
         } catch (Exception e) {
-            System.out.println("复制异常");
             e.printStackTrace();
+            TipsUtil.log("copy exception : " + e.getMessage());
+            return false;
         } finally {
-            if (null != out) {
+            if (null != fIn) {
                 try {
-                    out.close();
+                    fIn.close();
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -332,6 +352,20 @@ public class FileUtils {
             if (null != in) {
                 try {
                     in.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+            if (null != fOut) {
+                try {
+                    fOut.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+            if (null != out) {
+                try {
+                    out.close();
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
